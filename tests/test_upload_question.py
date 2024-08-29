@@ -69,12 +69,23 @@ class UploadTest(PyxformTestCase):
         self.assertPyxformXform(
             name="data",
             md="""
+            | settings |            |
+            |          | namespaces |
+            |          | esri="http://esri.com/xforms" |
             | survey |       |                  |                 |                               |
-            |        | type  | name             | label           | body:esri:style               |
+            |        | type  | name             | label           | body::esri:style              |
             |        | text  | watermark_phrase | Watermark Text: |                               |
             |        | text  | text1            | Text            |                               |
             |        | image | image1           | Take a Photo:   | watermark=${watermark_phrase} |
             """,
             errored=False,
-            xml__contains=["watermark= /data/watermark_phrase "],
+            xml__xpath_match=[
+                """
+                /h:html/h:body/x:upload[@ref = '/data/image1']/@*[
+                  local-name() = 'style'
+                  and namespace-uri() = 'http://esri.com/xforms'
+                  and . = 'watermark= /data/watermark_phrase '
+                ]
+                """
+            ],
         )

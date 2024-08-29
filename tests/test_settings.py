@@ -293,3 +293,27 @@ class TestNamespaces(PyxformTestCase):
                 """,
             ],
         )
+
+    def test_primary_instance_attribute__references(self):
+        """Should find the custom instance attribute has the references resolved."""
+        # Standard attributes not resolved.
+        md = """
+        | settings |
+        |          | attribute::xyz | form_id |
+        |          | ${q1}          | ${q2}   |
+        | survey |       |      |       |
+        |        | type  | name | label |
+        |        | text  | q1   | hello |
+        |        | text  | q2   | world |
+        """
+        self.assertPyxformXform(
+            md=md,
+            xml__xpath_match=[
+                """
+                  /h:html/h:head/x:model/x:instance/x:test_name[
+                    @xyz = ' /test_name/q1 '
+                    and @id = '${q2}'
+                  ]
+                """,
+            ],
+        )

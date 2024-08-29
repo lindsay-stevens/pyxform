@@ -624,7 +624,7 @@ class Survey(Section):
 
         # set these first to prevent overwriting id and version
         for key, value in self.attribute.items():
-            result.setAttribute(str(key), value)
+            result.setAttribute(str(key), self.insert_xpaths(value, self))
 
         result.setAttribute("id", self.id_string)
 

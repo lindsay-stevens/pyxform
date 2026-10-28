@@ -550,13 +550,13 @@ class TestOutputXpathExpressions(PyxformTestCase):
     def test_operator_escaping(self):
         """Should escape XML characters."""
         # EDB01 EDB02 EDB03 EDB08
-        inp = "Valid: {{ ${q1} < 10 and ${q2} <= 20 }}"
-        expected = """Valid: <output value="  /test_name/q1  &lt; 10 and  /test_name/q2  &lt;= 20 "/>"""
+        inp = "Valid <=> {{ ${q1} < 10 and ${q2} <= 20 }}"
+        expected = """Valid &lt;=&gt; <output value="  /test_name/q1  &lt; 10 and  /test_name/q2  &lt;= 20 "/>"""
         self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
-                (xpq.body_input_label_text("q1"), {" Valid: ", " "}),
+                (xpq.body_input_label_text("q1"), {" Valid <=> ", " "}),
                 (
                     xpq.body_input_label_output_value("q1"),
                     {"  /test_name/q1  < 10 and  /test_name/q2  <= 20 "},
@@ -567,13 +567,13 @@ class TestOutputXpathExpressions(PyxformTestCase):
     def test_operator_escaping__instance(self):
         """Should escape XML characters (instance() expression case for pyxform/#879)."""
         # EDB01 EDB02 EDB03 EDB08
-        inp = "You're ${q1} years old. {{ instance('age_messages')/root/item[${q1} >= min_age and ${q1} <= max_age]/label }}"
-        expected = """You're <output value=" /test_name/q1 "/> years old. <output value=" instance('age_messages')/root/item[ /test_name/q1  &gt;= min_age and  /test_name/q1  &lt;= max_age]/label "/>"""
+        inp = "You're ${q1} years old <=> {{ instance('age_messages')/root/item[${q1} >= min_age and ${q1} <= max_age]/label }}"
+        expected = """You're <output value=" /test_name/q1 "/> years old &lt;=&gt; <output value=" instance('age_messages')/root/item[ /test_name/q1  &gt;= min_age and  /test_name/q1  &lt;= max_age]/label "/>"""
         self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
-                (xpq.body_input_label_text("q1"), {" You're ", " ", " years old. "}),
+                (xpq.body_input_label_text("q1"), {" You're ", " ", " years old <=> "}),
                 (
                     xpq.body_input_label_output_value("q1"),
                     {
@@ -584,21 +584,42 @@ class TestOutputXpathExpressions(PyxformTestCase):
             ],
         )
 
-    def test_literal_ampersand_escaping(self):
+    def test_ampersand_escaping(self):
         """Should escape XML characters."""
         # EDB01 EDB02 EDB03 EDB08
-        inp = "Menu: {{ concat('Fish & Chips: ', ${q1}) }}"
-        expected = (
-            """Menu: <output value=" concat('Fish &amp; Chips: ',  /test_name/q1 ) "/>"""
-        )
+        inp = "Menu: {{ concat('Fish & Chips: ', ${q1}) }} & tartare"
+        expected = """Menu: <output value=" concat('Fish &amp; Chips: ',  /test_name/q1 ) "/> &amp; tartare"""
         self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
-                (xpq.body_input_label_text("q1"), {" Menu: ", " "}),
+                (xpq.body_input_label_text("q1"), {" Menu: ", " & tartare "}),
                 (
                     xpq.body_input_label_output_value("q1"),
                     {" concat('Fish & Chips: ',  /test_name/q1 ) "},
+                ),
+            ],
+        )
+
+    def test_double_quote_escaping(self):
+        """Should escape XML characters: double quotes escaped in attributes but not text."""
+        # EDB01 EDB02 EDB03 EDB08
+        inp = """Menu: {{ concat("Fish & Chips: ", ${q1}) }} it's "edible"!"""
+        expected = """Menu: <output value=" concat(&quot;Fish &amp; Chips: &quot;,  /test_name/q1 ) "/> it's "edible"!"""
+        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        self.assertPyxformXform(
+            md=MD_SURVEY.format(label=inp),
+            xml__xpath_exact=[
+                (
+                    xpq.body_input_label_text("q1"),
+                    {
+                        " Menu: ",
+                        """ it's "edible"! """,
+                    },
+                ),
+                (
+                    xpq.body_input_label_output_value("q1"),
+                    {""" concat("Fish & Chips: ",  /test_name/q1 ) """},
                 ),
             ],
         )

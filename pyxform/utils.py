@@ -53,14 +53,8 @@ class DetachableElement(Element):
             writer.write(">")
             # For text or mixed content, write without adding indents or newlines.
             if any(c.nodeType in NODE_TYPE_TEXT for c in self.childNodes):
-                # Conditions to match old Survey.py regex for remaining whitespace.
-                child_nodes = len(self.childNodes)
-                for idx, cnode in enumerate(self.childNodes):
-                    if 1 < child_nodes and idx == 0 and cnode.nodeType in NODE_TYPE_TEXT:
-                        writer.write(" ")
+                for cnode in self.childNodes:
                     cnode.writexml(writer, "", "", "")
-                    if 1 < child_nodes and (idx + 1) == child_nodes:
-                        writer.write(" ")
             else:
                 writer.write(newl)
                 for cnode in self.childNodes:

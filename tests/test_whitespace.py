@@ -13,7 +13,7 @@ class WhitespaceTest(PyxformTestCase):
             |         | text            | Ignored     | var   |
             |         | note            | ${var} text | label |
             """,
-            xml__contains=['<label><output value=" /issue96/var "/> text </label>'],
+            xml__contains=['<label> <output value=" /issue96/var "/> text </label>'],
         )
 
     def test_whitespace_output_permutations(self):
@@ -49,7 +49,7 @@ class WhitespaceTest(PyxformTestCase):
                         (
                             xp.format("C1"),
                             {
-                                f"""<label><output value=" /test_name/{case} "/> After </label>"""
+                                f"""<label> <output value=" /test_name/{case} "/> After </label>"""
                             },
                         ),
                         (
@@ -61,13 +61,13 @@ class WhitespaceTest(PyxformTestCase):
                         (
                             xp.format("E1"),
                             {
-                                f"""<label><output value=" /test_name/{case} "/> <output value=" /test_name/{case} "/> After x2 </label>"""
+                                f"""<label> <output value=" /test_name/{case} "/> <output value=" /test_name/{case} "/> After x2 </label>"""
                             },
                         ),
                         (
                             xp.format("F1"),
                             {
-                                f"""<label><output value=" /test_name/{case} "/> Between <output value=" /test_name/{case} "/> </label>"""
+                                f"""<label> <output value=" /test_name/{case} "/> Between <output value=" /test_name/{case} "/> </label>"""
                             },
                         ),
                         (

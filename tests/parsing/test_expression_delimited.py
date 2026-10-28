@@ -31,6 +31,7 @@ from pyxform.errors import ErrorCode, PyXFormError
 from pyxform.parsing.expression_delimited import replace_with_output
 from pyxform.question import InputQuestion
 from pyxform.survey import Survey
+from pyxform.utils import node
 
 from tests.pyxform_test_case import PyxformTestCase
 from tests.xpath_helpers.choices import xpc
@@ -57,6 +58,16 @@ MD_SURVEY_CHOICES = f"""
 | | list_name | name | label |
 | | c1        | n1   | N1    |
 """
+
+
+def render(*args):
+    """
+    Pass the input args to replace_with_output and return the rendered inner XML result.
+
+    :param args: Variables to pass to replace_with_output()
+    """
+    # len("<x>") = 3; len("</x>") = 4
+    return node("x", *replace_with_output(*args)).toxml()[3:-4]
 
 
 class TestParsingErrors(PyxformTestCase):
@@ -183,7 +194,7 @@ class TestOutputText(PyxformTestCase):
         """Should accept an empty string."""
         # EDB11 EDB12
         inp = ""
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         # Label required, so XPath assertion not testable.
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
@@ -195,7 +206,7 @@ class TestOutputText(PyxformTestCase):
         """Should accept plain text."""
         # EDB12
         inp = "Welcome to the survey!"
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {inp})],
@@ -205,7 +216,7 @@ class TestOutputText(PyxformTestCase):
         """Should accept multiline text."""
         # EDB12
         inp = """Line 1\n  Line 2\twith tabs"""
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         ss_structure = {
             "survey_header": [{"type": None, "name": None, "label": None}],
             "survey": [
@@ -224,8 +235,8 @@ class TestOutputText(PyxformTestCase):
         """Should accept variable references."""
         # EDB10
         inp = "Hello ${q1}, your score is ${q2}."
-        expected = """Hello <output value=" /test_name/q1 "/>, your score is <output value=" /test_name/q2 "/>."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Hello <output value=" /test_name/q1 "/>, your score is <output value=" /test_name/q2 "/>. """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -241,7 +252,7 @@ class TestOutputText(PyxformTestCase):
         """Should ignore single delimiter tokens."""
         # EDB12 EDB14
         inp = "Item costs $10 or {5} credits."
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {inp})],
@@ -251,7 +262,7 @@ class TestOutputText(PyxformTestCase):
         """Should ignore unclosed opening delimiter."""
         # EDB11 EDB12 EDB14
         inp = "{{"
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {inp})],
@@ -261,7 +272,7 @@ class TestOutputText(PyxformTestCase):
         """Should ignore unmatched closing delimiter."""
         # EDB12 EDB14
         inp = "Unmatched closing delimiter }} kept as text."
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {inp})],
@@ -271,7 +282,7 @@ class TestOutputText(PyxformTestCase):
         """Should ignore file paths or single backslash."""
         # EDB12 EDB14
         inp = r"C:\Users\test\file.txt \ "
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {inp.strip()})],
@@ -281,7 +292,7 @@ class TestOutputText(PyxformTestCase):
         """Should ignore partial escape sequences."""
         # EDB12 EDB14
         inp = r"\{ escaped \} but \\"
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {inp})],
@@ -296,7 +307,7 @@ class TestOutputBasicExpressions(PyxformTestCase):
         # EDB01 EDB02
         inp = "{{ 1 + 1 }}"
         expected = '<output value=" 1 + 1 "/>'
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_output_value("q1"), {" 1 + 1 "})],
@@ -306,8 +317,8 @@ class TestOutputBasicExpressions(PyxformTestCase):
         """Should accept adjacent templates."""
         # EDB01 EDB02 EDB06
         inp = "{{ 1 + 1 }}{{ 2 + 2 }}"
-        expected = '<output value=" 1 + 1 "/><output value=" 2 + 2 "/>'
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """<output value=" 1 + 1 "/><output value=" 2 + 2 "/>"""
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -322,8 +333,8 @@ class TestOutputBasicExpressions(PyxformTestCase):
         """Should accept expressions with no spaces inside the delimiters."""
         # EDB01
         inp = "Value: {{today()}}"
-        expected = 'Value: <output value="today()"/>'
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Value: <output value="today()"/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -336,8 +347,8 @@ class TestOutputBasicExpressions(PyxformTestCase):
         """Should accept but not strip spaces inside expression delimiters."""
         # EDB01 EDB02
         inp = "Value: {{   count(/data/item)   }}"
-        expected = 'Value: <output value="   count(/data/item)   "/>'
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Value: <output value="   count(/data/item)   "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -353,8 +364,8 @@ class TestOutputBasicExpressions(PyxformTestCase):
         """Should accept and preserve XPath expressions."""
         # EDB01
         inp = "Selected item: {{ instance('cities')/root/item[id = 1]/name }}"
-        expected = """Selected item: <output value=" instance('cities')/root/item[id = 1]/name "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Selected item: <output value=" instance('cities')/root/item[id = 1]/name "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -370,8 +381,8 @@ class TestOutputBasicExpressions(PyxformTestCase):
         """Should accept multiline expression with internal whitespace."""
         # EDB01 EDB02 EDB03 EDB08
         inp = "Result: {{\n  if(\n    ${q1} >= 18,\n    'Adult',\n    'Minor'\n  )\n}}"
-        expected = """Result: <output value="\n  if(\n     /test_name/q1  &gt;= 18,\n    'Adult',\n    'Minor'\n  )\n"/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Result: <output value="\n  if(\n     /test_name/q1  &gt;= 18,\n    'Adult',\n    'Minor'\n  )\n"/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         ss_structure = {
             "survey_header": [{"type": None, "name": None, "label": None}],
             "survey": [
@@ -398,8 +409,8 @@ class TestOutputVariableResolution(PyxformTestCase):
         """Should accept single variable reference."""
         # EDB01 EDB08
         inp = "Value: {{${q1}}}"
-        expected = """Value: <output value=" /test_name/q1 "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Value: <output value=" /test_name/q1 "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -412,8 +423,8 @@ class TestOutputVariableResolution(PyxformTestCase):
         """Should accept repeated variable references."""
         # EDB01 EDB02 EDB08
         inp = "Double: {{ ${q1} + ${q1} }}"
-        expected = """Double: <output value="  /test_name/q1  +  /test_name/q1  "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Double: <output value="  /test_name/q1  +  /test_name/q1  "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -430,9 +441,9 @@ class TestOutputVariableResolution(PyxformTestCase):
         # EDB01 EDB02 EDB08
         inp = "Total cost: {{ ${q1} * ${q2} }} USD"
         expected = (
-            """Total cost: <output value="  /test_name/q1  *  /test_name/q2  "/> USD"""
+            """ Total cost: <output value="  /test_name/q1  *  /test_name/q2  "/> USD """
         )
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -448,8 +459,8 @@ class TestOutputVariableResolution(PyxformTestCase):
         """Should accept variable references inside and outside expression."""
         # EDB01 EDB02 EDB08 EDB10
         inp = "User ${q1}, your total is {{ ${q1} * 2 }}."
-        expected = """User <output value=" /test_name/q1 "/>, your total is <output value="  /test_name/q1  * 2 "/>."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ User <output value=" /test_name/q1 "/>, your total is <output value="  /test_name/q1  * 2 "/>. """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -465,8 +476,8 @@ class TestOutputVariableResolution(PyxformTestCase):
         """Should accept variable references with a unicode NCName."""
         # EDB01 EDB02 EDB08 EDB10
         inp = "Hola ${próxiMO}, total: {{ ${élémeNT} + 1 }}"
-        expected = """Hola <output value=" /test_name/próxiMO "/>, total: <output value="  /test_name/élémeNT  + 1 "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Hola <output value=" /test_name/próxiMO "/>, total: <output value="  /test_name/élémeNT  + 1 "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         md_extra = """
         | | text | próxiMO | PróxiMO |
         | | text | élémeNT | ÉlémeNT |
@@ -486,8 +497,8 @@ class TestOutputVariableResolution(PyxformTestCase):
         """Should accept last-saved variable references."""
         # EDB01 EDB02 EDB08 EDB10
         inp = "Previous: ${last-saved#q1}, Calculated: {{ ${last-saved#q2} * 1.1 }}"
-        expected = """Previous: <output value=" instance('__last-saved')/test_name/q1 "/>, Calculated: <output value="  instance('__last-saved')/test_name/q2  * 1.1 "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Previous: <output value=" instance('__last-saved')/test_name/q1 "/>, Calculated: <output value="  instance('__last-saved')/test_name/q2  * 1.1 "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -509,12 +520,12 @@ class TestOutputVariableResolution(PyxformTestCase):
         """Should accept adjacent variable references."""
         # EDB01 EDB02 EDB08 EDB10
         inp = "${q1}{{ ${q1} * ${q2} }}${q2}"
-        expected = """<output value=" /test_name/q1 "/><output value="  /test_name/q1  *  /test_name/q2  "/><output value=" /test_name/q2 "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ <output value=" /test_name/q1 "/><output value="  /test_name/q1  *  /test_name/q2  "/><output value=" /test_name/q2 "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
-                (xpq.body_input_label_text("q1"), {"\n      ", "\n        "}),
+                (xpq.body_input_label_text("q1"), {" "}),
                 (
                     xpq.body_input_label_output_value("q1"),
                     {
@@ -534,8 +545,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should accept function with variable references."""
         # EDB01 EDB02 EDB08
         inp = "Welcome {{ coalesce(upper-case(${q1}), 'Guest') }}!"
-        expected = """Welcome <output value=" coalesce(upper-case( /test_name/q1 ), 'Guest') "/>!"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Welcome <output value=" coalesce(upper-case( /test_name/q1 ), 'Guest') "/>! """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -551,8 +562,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should escape XML characters."""
         # EDB01 EDB02 EDB03 EDB08
         inp = "Valid <=> {{ ${q1} < 10 and ${q2} <= 20 }}"
-        expected = """Valid &lt;=&gt; <output value="  /test_name/q1  &lt; 10 and  /test_name/q2  &lt;= 20 "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Valid &lt;=&gt; <output value="  /test_name/q1  &lt; 10 and  /test_name/q2  &lt;= 20 "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -568,8 +579,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should escape XML characters (instance() expression case for pyxform/#879)."""
         # EDB01 EDB02 EDB03 EDB08
         inp = "You're ${q1} years old <=> {{ instance('age_messages')/root/item[${q1} >= min_age and ${q1} <= max_age]/label }}"
-        expected = """You're <output value=" /test_name/q1 "/> years old &lt;=&gt; <output value=" instance('age_messages')/root/item[ /test_name/q1  &gt;= min_age and  /test_name/q1  &lt;= max_age]/label "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ You're <output value=" /test_name/q1 "/> years old &lt;=&gt; <output value=" instance('age_messages')/root/item[ /test_name/q1  &gt;= min_age and  /test_name/q1  &lt;= max_age]/label "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -588,8 +599,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should escape XML characters."""
         # EDB01 EDB02 EDB03 EDB08
         inp = "Menu: {{ concat('Fish & Chips: ', ${q1}) }} & tartare"
-        expected = """Menu: <output value=" concat('Fish &amp; Chips: ',  /test_name/q1 ) "/> &amp; tartare"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Menu: <output value=" concat('Fish &amp; Chips: ',  /test_name/q1 ) "/> &amp; tartare """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -605,8 +616,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should escape XML characters: double quotes escaped in attributes but not text."""
         # EDB01 EDB02 EDB03 EDB08
         inp = """Menu: {{ concat("Fish & Chips: ", ${q1}) }} it's "edible"!"""
-        expected = """Menu: <output value=" concat(&quot;Fish &amp; Chips: &quot;,  /test_name/q1 ) "/> it's "edible"!"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Menu: <output value=" concat(&quot;Fish &amp; Chips: &quot;,  /test_name/q1 ) "/> it's "edible"! """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -628,8 +639,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should accept secondary instance lookups with predicate filtering."""
         # EDB01 EDB02 EDB08
         inp = "Facility: {{ instance('facilities')/root/item[id=${q1}]/label }}"
-        expected = """Facility: <output value=" instance('facilities')/root/item[id= /test_name/q1 ]/label "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Facility: <output value=" instance('facilities')/root/item[id= /test_name/q1 ]/label "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -645,8 +656,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should accept complex nested functions with operators and variable references."""
         # EDB01 EDB02 EDB03 EDB08
         inp = "Score: {{ if(${q1} >= 80, concat('PASS: ', round(${q1} * 1.1, 2), '%'), if(${q1} >= 50, 'RETRY', 'FAIL')) }}"
-        expected = """Score: <output value=" if( /test_name/q1  &gt;= 80, concat('PASS: ', round( /test_name/q1  * 1.1, 2), '%'), if( /test_name/q1  &gt;= 50, 'RETRY', 'FAIL')) "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Score: <output value=" if( /test_name/q1  &gt;= 80, concat('PASS: ', round( /test_name/q1  * 1.1, 2), '%'), if( /test_name/q1  &gt;= 50, 'RETRY', 'FAIL')) "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -664,8 +675,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should accept and preserve date formatting specifiers."""
         # EDB01 EDB02 EDB08
         inp = "Visit scheduled for {{ format-date(${q1}, '%A, %b %e, %Y') }}."
-        expected = """Visit scheduled for <output value=" format-date( /test_name/q1 , '%A, %b %e, %Y') "/>."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Visit scheduled for <output value=" format-date( /test_name/q1 , '%A, %b %e, %Y') "/>. """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -681,8 +692,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         """Should accept indexed repeat lookups."""
         # EDB01 EDB02 EDB08
         inp = "Primary Contact: {{ indexed-repeat(${q1}, ${q2}, 1) }}"
-        expected = """Primary Contact: <output value=" indexed-repeat( /test_name/q1 ,  /test_name/q2 , 1) "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Primary Contact: <output value=" indexed-repeat( /test_name/q1 ,  /test_name/q2 , 1) "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -699,8 +710,8 @@ class TestOutputXpathExpressions(PyxformTestCase):
         # EDB01 EDB02 EDB06 EDB08
         # pyxform/#844 alternative strategy with new feature.
         inp = """Thing's label: {{instance('c1')/root/item[name=${q1} or true()]/label}} Thing's denomination: {{instance('c1')/root/item[name=${q1}]/denomination}} and more stuff."""
-        expected = """Thing's label: <output value="instance('c1')/root/item[name= /test_name/q1  or true()]/label"/> Thing's denomination: <output value="instance('c1')/root/item[name= /test_name/q1 ]/denomination"/> and more stuff."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Thing's label: <output value="instance('c1')/root/item[name= /test_name/q1  or true()]/label"/> Thing's denomination: <output value="instance('c1')/root/item[name= /test_name/q1 ]/denomination"/> and more stuff. """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -730,8 +741,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should accept escaped delimiters."""
         # EDB04 EDB10
         inp = r"Literal \{{ ${q1} \}} display."
-        expected = """Literal {{ <output value=" /test_name/q1 "/> }} display."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Literal {{ <output value=" /test_name/q1 "/> }} display. """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -750,8 +761,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should accept escaped closing delimiter outside an expression."""
         # EDB04
         inp = r"Hello \}} there"
-        expected = """Hello }} there"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Hello }} there """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {expected})],
@@ -761,8 +772,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should accept escaped opening delimiter outside an expression."""
         # EDB04
         inp = r"Hello \{{ there"
-        expected = r"Hello {{ there"
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = r" Hello {{ there "
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {expected})],
@@ -772,8 +783,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should accept escaped closing delimiter inside an expression."""
         # EDB01 EDB05
         inp = r"Result: {{ concat('foo', '\}}') }}"
-        expected = """Result: <output value=" concat('foo', '}}') "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Result: <output value=" concat('foo', '}}') "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -789,8 +800,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should accept escaped opening delimiter inside an expression."""
         # EDB01 EDB05 EDB08
         inp = r"Result: {{ concat('\{{', ${q1}) }}"
-        expected = """Result: <output value=" concat('{{',  /test_name/q1 ) "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Result: <output value=" concat('{{',  /test_name/q1 ) "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -806,8 +817,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should accept string with escaped an unescaped delimiters."""
         # EDB01 EDB04 EDB08 EDB10
         inp = r"User ${q1}: \{{ literal \}} evaluates to {{ ${q2} * 100 }}%"
-        expected = """User <output value=" /test_name/q1 "/>: {{ literal }} evaluates to <output value="  /test_name/q2  * 100 "/>%"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ User <output value=" /test_name/q1 "/>: {{ literal }} evaluates to <output value="  /test_name/q2  * 100 "/>% """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -826,8 +837,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should ignore adjacent escaped delimiters."""
         # EDB04
         inp = r"\{{\{{\}}\}}"
-        expected = r"{{{{}}}}"
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = r" {{{{}}}} "
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {expected})],
@@ -837,8 +848,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should ignore double-escaped delimiters."""
         # EDB04
         inp = r"\\{{\\}}"
-        expected = r"\{{\}}"
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = r" \{{\}} "
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {expected})],
@@ -848,8 +859,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should ignore escaped delimiters in multi-line strings."""
         # EDB04
         inp = "Line 1: \\{{\nLine 2: \\}}"
-        expected = "Line 1: {{\nLine 2: }}"
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = " Line 1: {{\nLine 2: }} "
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         ss_structure = {
             "survey_header": [{"type": None, "name": None, "label": None}],
             "survey": [
@@ -866,8 +877,8 @@ class TestOutputDelimiterEscaping(PyxformTestCase):
         """Should ignore escaped delimiters adjacent to variable references."""
         # EDB04 EDB10
         inp = r"${q1}\{{ ${q2} \}}${q1}"
-        expected = """<output value=" /test_name/q1 "/>{{ <output value=" /test_name/q2 "/> }}<output value=" /test_name/q1 "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ <output value=" /test_name/q1 "/>{{ <output value=" /test_name/q2 "/> }}<output value=" /test_name/q1 "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -887,8 +898,8 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         """Should ignore single delimiter tokens in single quotes in an expression."""
         # EDB01 EDB08 EDB14
         inp = "Output: {{ concat('Val: $', ${q1}, ' {tax incl.}') }}"
-        expected = """Output: <output value=" concat('Val: $',  /test_name/q1 , ' {tax incl.}') "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Output: <output value=" concat('Val: $',  /test_name/q1 , ' {tax incl.}') "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -904,8 +915,8 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         """Should ignore single delimiter tokens in double quotes in an expression."""
         # EDB01 EDB03 EDB08 EDB14
         inp = 'Output: {{ concat("Val: $", ${q1}, " {tax incl.}") }}'
-        expected = """Output: <output value=" concat(&quot;Val: $&quot;,  /test_name/q1 , &quot; {tax incl.}&quot;) "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Output: <output value=" concat(&quot;Val: $&quot;,  /test_name/q1 , &quot; {tax incl.}&quot;) "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -921,8 +932,8 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         """Should ignore single delimiter tokens in XPath in an expression."""
         # EDB01 EDB03 EDB08 EDB14
         inp = "Data: {{ instance('items')/root/item[code = 'x}y' and ${q1} > 0]/name }}"
-        expected = """Data: <output value=" instance('items')/root/item[code = 'x}y' and  /test_name/q1  &gt; 0]/name "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Data: <output value=" instance('items')/root/item[code = 'x}y' and  /test_name/q1  &gt; 0]/name "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -940,8 +951,8 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         """Should ignore extra delimiter tokens and accept outer pair of delimiter tokens."""
         # EDB01 EDB08 EDB14
         inp = "Triple open: {{{ ${q1} }}}"
-        expected = 'Triple open: <output value="{  /test_name/q1  }"/>'
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Triple open: <output value="{  /test_name/q1  }"/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -957,8 +968,8 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         """Should ignore extra delimiter token and accept outer opening delimiter."""
         # EDB01 EDB08 EDB14
         inp = "Triple open: {{{ ${q1} }}"
-        expected = """Triple open: <output value="{  /test_name/q1  "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Triple open: <output value="{  /test_name/q1  "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -971,8 +982,8 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         """Should ignore extra delimiter token and accept outer closing delimiter."""
         # EDB01 EDB08 EDB14
         inp = "Triple close: {{ ${q1} }}}"
-        expected = """Triple close: <output value="  /test_name/q1  }"/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Triple close: <output value="  /test_name/q1  }"/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -985,8 +996,10 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         """Should ignore single quote near accepted opening delimiter."""
         # EDB01 EDB08 EDB14
         inp = "Starting brace: {{ concat('{', ${q1}) }}"
-        expected = """Starting brace: <output value=" concat('{',  /test_name/q1 ) "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = (
+            """ Starting brace: <output value=" concat('{',  /test_name/q1 ) "/> """
+        )
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -1002,8 +1015,8 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         """Should ignore single quote near accepted closing delimiter."""
         # EDB01 EDB08 EDB14
         inp = "Ending brace: {{ concat(${q1}, '}') }}"
-        expected = """Ending brace: <output value=" concat( /test_name/q1 , '}') "/>"""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Ending brace: <output value=" concat( /test_name/q1 , '}') "/> """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -1020,9 +1033,9 @@ class TestOutputDelimiterAmbiguity(PyxformTestCase):
         # EDB01 EDB08 EDB14
         inp = r"Path: {{ concat('C:\temp\node', ${q1}) }}"
         expected = (
-            r"""Path: <output value=" concat('C:\temp\node',  /test_name/q1 ) "/>"""
+            r""" Path: <output value=" concat('C:\temp\node',  /test_name/q1 ) "/> """
         )
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY.format(label=inp),
             xml__xpath_exact=[
@@ -1042,8 +1055,8 @@ class TestOutputFallbackInstanceExpression(PyxformTestCase):
         """Should ignore instance() in text adjacent to delimited expression."""
         # EDB01 EDB13
         inp = "Lookup {{instance('c1')/root/item[./text() = 'OK!']}} instance('c1')/root/item[./text() = 'OK!'] ."
-        expected = """Lookup <output value="instance('c1')/root/item[./text() = 'OK!']"/> instance('c1')/root/item[./text() = 'OK!'] ."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Lookup <output value="instance('c1')/root/item[./text() = 'OK!']"/> instance('c1')/root/item[./text() = 'OK!'] . """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY_CHOICES.format(label=inp),
             xml__xpath_exact=[
@@ -1062,8 +1075,8 @@ class TestOutputFallbackInstanceExpression(PyxformTestCase):
         """Should ignore instance() in text adjacent to escaped expression opening delimiter."""
         # EDB04 EDB13
         inp = r"Lookup \{{ instance('c1')/root/item[./text() = 'OK!'] ."
-        expected = """Lookup {{ instance('c1')/root/item[./text() = 'OK!'] ."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Lookup {{ instance('c1')/root/item[./text() = 'OK!'] . """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY_CHOICES.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {expected})],
@@ -1073,8 +1086,8 @@ class TestOutputFallbackInstanceExpression(PyxformTestCase):
         """Should ignore instance() in text adjacent to escaped expression closing delimiter."""
         # EDB04 EDB13
         inp = r"Lookup \}} instance('c1')/root/item[./text() = 'OK!'] ."
-        expected = """Lookup }} instance('c1')/root/item[./text() = 'OK!'] ."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Lookup }} instance('c1')/root/item[./text() = 'OK!'] . """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY_CHOICES.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {expected})],
@@ -1085,9 +1098,9 @@ class TestOutputFallbackInstanceExpression(PyxformTestCase):
         # EDB13
         inp = "Lookup instance('c1')/root/item[./text() = 'OK!'] ."
         expected = (
-            """Lookup <output value="instance('c1')/root/item[./text() = 'OK!']"/> ."""
+            """ Lookup <output value="instance('c1')/root/item[./text() = 'OK!']"/> . """
         )
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY_CHOICES.format(label=inp),
             xml__xpath_exact=[
@@ -1106,8 +1119,8 @@ class TestOutputFallbackInstanceExpression(PyxformTestCase):
         """Should process instance() with variable reference adjacent to the expression."""
         # EDB10 EDB13
         inp = "Lookup ${q2} instance('c1')/root/item[./text() = 'OK!'] ."
-        expected = """Lookup <output value=" /test_name/q2 "/> <output value="instance('c1')/root/item[./text() = 'OK!']"/> ."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Lookup <output value=" /test_name/q2 "/> <output value="instance('c1')/root/item[./text() = 'OK!']"/> . """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY_CHOICES.format(label=inp),
             xml__xpath_exact=[
@@ -1126,8 +1139,8 @@ class TestOutputFallbackInstanceExpression(PyxformTestCase):
         """Should process instance() with variable reference inside of the expression."""
         # EDB10 EDB13
         inp = "Lookup instance('c1')/root/item[${q2} = 'OK!'] ."
-        expected = """Lookup <output value="instance('c1')/root/item[ /test_name/q2  = 'OK!']"/> ."""
-        self.assertEqual(expected, replace_with_output(inp, Q1, SURVEY))
+        expected = """ Lookup <output value="instance('c1')/root/item[ /test_name/q2  = 'OK!']"/> . """
+        self.assertEqual(expected, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY_CHOICES.format(label=inp),
             xml__xpath_exact=[
@@ -1146,7 +1159,7 @@ class TestOutputFallbackInstanceExpression(PyxformTestCase):
         """Should not modify text with no <output/> triggers present."""
         # EDB12
         inp = "Lookup at the sky."
-        self.assertEqual(inp, replace_with_output(inp, Q1, SURVEY))
+        self.assertEqual(inp, render(inp, Q1, SURVEY))
         self.assertPyxformXform(
             md=MD_SURVEY_CHOICES.format(label=inp),
             xml__xpath_exact=[(xpq.body_input_label_text("q1"), {inp})],

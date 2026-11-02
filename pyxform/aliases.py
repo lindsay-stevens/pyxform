@@ -66,7 +66,7 @@ survey_header = {
     "readonly": ("bind", "readonly"),
     "relevant": ("bind", "relevant"),
     "caption": constants.LABEL,
-    "appearance": (constants.CONTROL, "appearance"),
+    "appearance": (constants.CONTROL, constants.APPEARANCE),
     "relevance": ("bind", "relevant"),
     "required": ("bind", "required"),
     "constraint": ("bind", "constraint"),

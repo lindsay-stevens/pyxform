@@ -471,7 +471,7 @@ def workbook_to_json(
 
         # Get question type
         question_type = row.get(constants.TYPE)
-        appearance = row.get(constants.CONTROL, {}).get("appearance")
+        appearance = row.get(constants.CONTROL, {}).get(constants.APPEARANCE)
 
         if not question_type:
             # if name and label are also missing,
@@ -834,7 +834,9 @@ def workbook_to_json(
                         for w in appearance_mods_as_list:
                             if w != constants.TABLE_LIST:
                                 appearance_string += " " + str(w)
-                        new_json_dict[constants.CONTROL]["appearance"] = appearance_string
+                        new_json_dict[constants.CONTROL][constants.APPEARANCE] = (
+                            appearance_string
+                        )
 
                         # Generate a note label element so hints and labels
                         # work as expected in table-lists.

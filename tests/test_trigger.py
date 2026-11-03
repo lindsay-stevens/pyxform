@@ -2,6 +2,7 @@
 
 from itertools import product
 
+from pyxform import constants as co
 from pyxform.errors import ErrorCode
 
 from tests.pyxform_test_case import PyxformTestCase
@@ -19,7 +20,7 @@ class TriggerSetvalueTests(PyxformTestCase):
             errored=True,
             error__contains=[
                 ErrorCode.PYREF_003.value.format(
-                    sheet="survey", column="trigger", row=2, q="a"
+                    sheet=co.SURVEY, column=co.TRIGGER, row=2, q="a"
                 )
             ],
         )
@@ -35,7 +36,7 @@ class TriggerSetvalueTests(PyxformTestCase):
             errored=True,
             error__contains=[
                 ErrorCode.PYREF_001.value.format(
-                    sheet="survey", column="trigger", row=2, q="6"
+                    sheet=co.SURVEY, column=co.TRIGGER, row=2, q="6"
                 )
             ],
         )
@@ -393,7 +394,7 @@ class TriggerSetvalueTests(PyxformTestCase):
                     errored=True,
                     error__contains=[
                         ErrorCode.PYREF_002.value.format(
-                            sheet="survey", column="trigger", row="4"
+                            sheet=co.SURVEY, column=co.TRIGGER, row="4"
                         )
                     ],
                 )

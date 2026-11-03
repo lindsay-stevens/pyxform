@@ -1,3 +1,4 @@
+from pyxform import constants as co
 from pyxform.errors import ErrorCode
 from pyxform.validators.pyxform import question_types as qt
 
@@ -33,7 +34,7 @@ class TestBackgroundGeopointParsing(PyxformTestCase):
             errored=True,
             error__contains=[
                 ErrorCode.PYREF_003.value.format(
-                    sheet="survey", column="trigger", row="3", q="invalid"
+                    sheet=co.SURVEY, column=co.TRIGGER, row="3", q="invalid"
                 )
             ],
         )

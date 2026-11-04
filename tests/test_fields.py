@@ -4,6 +4,7 @@ from pyxform import constants as co
 from pyxform.errors import ErrorCode
 
 from tests.pyxform_test_case import PyxformTestCase
+from tests.xpath_helpers.questions import xpq
 
 
 class TestQuestionParsing(PyxformTestCase):
@@ -632,3 +633,78 @@ class TestQuestionParsing(PyxformTestCase):
                 ),
             ],
         )
+
+    def test_visible_type_with_no_control_content__error(self):
+        """Should raise an error when no label/hint/media is provided."""
+        md = """
+        | survey |
+        || type   | name |
+        || {case} | q1   |
+        """
+        # Question types listed here are from the reference template, excluding those that
+        # require additional specifications (and so would raise some other error first).
+        cases = (
+            "acknowledge",
+            "audio",
+            "barcode",
+            "date",
+            "datetime",
+            "decimal",
+            "file",
+            "geopoint",
+            "geoshape",
+            "geotrace",
+            "image",
+            "integer",
+            "note",
+            "range",
+            "text",
+            "time",
+            "video",
+        )
+        for case in cases:
+            with self.subTest(case):
+                self.assertPyxformXform(
+                    md=md.format(case=case),
+                    errored=True,
+                    error__contains=[
+                        "The survey element named 'q1' has no label or hint."
+                    ],
+                )
+
+    def test_non_visible_type_with_no_control_content__ok(self):
+        """Should not raise an error when no label/hint/media is provided."""
+        md = """
+        | survey |
+        || type   | name | {key} |
+        || {type} | q1   | {val} |
+        """
+        # Question types listed here are from the reference template, excluding those that
+        # require additional specifications (and so would raise some other error first).
+        types = (
+            "background-audio",
+            "csv-external",
+            "deviceid",
+            "email",
+            "end",
+            "hidden",
+            "phonenumber",
+            "start",
+            "start-geopoint",
+            "today",
+            "username",
+        )
+        columns = (
+            ("label", "Q1"),
+            ("hint", "Q1"),
+            ("audio", "Q1.mp3"),
+            ("label::English (en)", "Q1"),
+        )
+        cases = ((t, c) for t in types for c in columns)
+        for case in cases:
+            with self.subTest(case):
+                self.assertPyxformXform(
+                    md=md.format(type=case[0], key=case[1][0], val=case[1][1]),
+                    xml__xpath_match=[xpq.body_empty()],
+                    warnings_count=0,
+                )
